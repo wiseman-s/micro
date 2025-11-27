@@ -1,9 +1,21 @@
-# Streamlit app dependencies
-streamlit>=1.26.1
+# Streamlit for the app
+streamlit==1.28.0
+
+# YOLO / computer vision
+ultralytics==8.0.144
+
+# Data handling
+pandas>=2.2.0
 numpy>=1.26.0
-pandas==2.1.1
-opencv-python-headless==4.8.1.78
-rich>=14.2.0
-markdown-it-py>=4.0.0
-mdurl~=0.1
-pygments>=2.19.2
+
+# Image handling
+opencv-python-headless>=4.8.1
+
+# For file handling / uploads
+Pillow>=10.0.0
+
+# Optional: for plotting if needed
+matplotlib>=3.8.0
+
+# If you use seaborn for visuals
+seaborn>=0.12.2
