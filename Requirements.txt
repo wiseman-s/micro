@@ -3,4 +3,5 @@ opencv-python-headless==4.8.1.78
 numpy==1.26.5
 pandas==2.1.1
 matplotlib==3.8.1
-ultralytics==8.0.148  # if using YOLOv8
+ultralytics==8.0.148
+Pillow==10.0.0
