@@ -1,10 +1,10 @@
 import streamlit as st
 from pathlib import Path
-from utils.detection import load_model, predict_with_model, SyntheticDetector
-from utils.qc import analyze_quality, brightness_histogram_plot
-from utils.morphology import compute_morphology_metrics, plot_size_distribution, plot_aspect_ratio
-from utils.explainability import simulated_heatmap
-from utils.helpers import save_upload, ensure_dirs
+from detection import load_model, predict_with_model, SyntheticDetector
+from qc import analyze_quality, brightness_histogram_plot
+from morphology import compute_morphology_metrics, plot_size_distribution, plot_aspect_ratio
+from explainability import simulated_heatmap
+from helpers import save_upload, ensure_dirs
 import pandas as pd
 import numpy as np
 import cv2
