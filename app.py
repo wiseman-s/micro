@@ -11,8 +11,11 @@ import cv2
 from datetime import datetime
 import random
 import io
+from PIL import Image
 
+# ---------------------------
 # Ensure folders exist
+# ---------------------------
 ensure_dirs()
 
 # ---------------------------
@@ -91,26 +94,20 @@ st.markdown(
 )
 
 # ---------------------------
-# Sidebar: Quick Summary & Controls
+# Sidebar
 # ---------------------------
 st.sidebar.subheader("Summary & Quick Actions")
 st.sidebar.write("Use this panel to quick-export, view uploads, and review results.")
 st.sidebar.markdown("**Quick metadata & exports**")
 st.sidebar.write(f"- Model shown: **YOLOv8** (presentation display)")
 st.sidebar.markdown("---")
-
-# Detection engine selection
 st.sidebar.markdown("**Select Detection Engine**")
 engine = st.sidebar.selectbox("Detection engine", ["Auto (use YOLO if model present)", "Synthetic fallback"])
 st.sidebar.markdown("---")
-
-# Microscopy modality
 st.sidebar.subheader("Microscopy Modality")
 modality = st.sidebar.selectbox("Modality",
                                 ["Brightfield", "Darkfield (simulated)", "Polarized (simulated)", "Fluorescence (simulated)"])
 st.sidebar.markdown("---")
-
-# Quick Guide at bottom
 st.sidebar.header("Quick Guide")
 st.sidebar.info("1) Upload a microscopy image (PNG/JPG).\n2) Run detection.\n3) Review morphology, QC and export results.")
 
@@ -129,41 +126,38 @@ with col1:
         filename = None
 
     if img_bytes:
-        # Open image via PIL
-        from PIL import Image
-        img_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        
-        # Convert to NumPy array for OpenCV / model processing
-        img = np.array(img_pil)
-        
-        # Display in Streamlit (RGB)
-        st.image(img, caption="Input image (RGB view)", use_container_width=True)
+        # Safe PIL image loading
+        try:
+            img_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+            img = np.array(img_pil, dtype=np.uint8)
+            if img.ndim != 3 or img.shape[2] != 3:
+                st.error(f"Unexpected image shape: {img.shape}")
+            else:
+                st.image(img, caption="Input image (RGB view)", use_container_width=True)
+        except Exception as e:
+            st.error(f"Failed to open uploaded image: {str(e)}")
+            img = None
 
+    if img_bytes and img is not None:
         # ------------------
-        # Image QC as note
+        # Image QC
         # ------------------
         st.subheader("Image Quality Control (QC)")
         qc = analyze_quality(img)
-        st.markdown(f"**QC Metrics:**\n- Sharpness: {qc.get('sharpness', 'N/A')}\n- Brightness: {qc.get('brightness', 'N/A')}\n- Noise: {qc.get('noise', 'N/A')}\n- Passes QC: {qc.get('passes', False)}")
+        st.markdown(
+            f"**QC Metrics:**\n"
+            f"- Sharpness: {qc.get('sharpness', 'N/A')}\n"
+            f"- Brightness: {qc.get('brightness', 'N/A')}\n"
+            f"- Noise: {qc.get('noise', 'N/A')}\n"
+            f"- Passes QC: {qc.get('passes', False)}"
+        )
         fig = brightness_histogram_plot(img)
         st.pyplot(fig)
         if not qc.get("passes", True):
             st.warning("Image does not pass QC. Consider retaking or improving lighting/focus.")
 
-
         # ------------------
-        # Image QC as note
-        # ------------------
-        st.subheader("Image Quality Control (QC)")
-        qc = analyze_quality(img)
-        st.markdown(f"**QC Metrics:**\n- Sharpness: {qc.get('sharpness', 'N/A')}\n- Brightness: {qc.get('brightness', 'N/A')}\n- Noise: {qc.get('noise', 'N/A')}\n- Passes QC: {qc.get('passes', False)}")
-        fig = brightness_histogram_plot(img)
-        st.pyplot(fig)
-        if not qc.get("passes", True):
-            st.warning("Image does not pass QC. Consider retaking or improving lighting/focus.")
-
-        # ------------------
-        # Load model or synthetic detector
+        # Load model or fallback
         # ------------------
         model = None
         try:
@@ -207,10 +201,13 @@ with col1:
                     h = int(d.get("h", d.get("height", 0)))
                     conf = float(d.get("conf", d.get("confidence", random.uniform(0.6, 0.95))))
                 else:
-                    x = y = 0; w = h = 0; conf = round(random.uniform(0.6, 0.95), 2)
+                    x = y = w = h = 0
+                    conf = round(random.uniform(0.6, 0.95), 2)
                 normalized.append({
-                    "detection_id": i+1, "x": x, "y": y, "w": w, "h": h,
-                    "confidence": round(conf,3), "assigned_label": assigned_label
+                    "detection_id": i+1,
+                    "x": x, "y": y, "w": w, "h": h,
+                    "confidence": round(conf, 3),
+                    "assigned_label": assigned_label
                 })
         else:
             # fallback single detection
@@ -221,7 +218,7 @@ with col1:
                            "assigned_label": assigned_label}]
 
         # ------------------
-        # Overlay with red labels
+        # Overlay with labels
         # ------------------
         vis = img.copy()
         for d in normalized:
@@ -230,21 +227,24 @@ with col1:
             cx, cy = int(x + w/2), int(y + h/2)
             cv2.circle(vis, (cx, cy), 4, (0,0,255), -1)
             label_txt = f"{d['assigned_label']} ({d['confidence']:.2f})"
-            # Red color for label text
             cv2.putText(vis, label_txt, (x, max(y-8,10)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 1, cv2.LINE_AA)
 
         st.subheader("Detections & Morphology")
-        st.image(vis[..., ::-1], caption="Detections overlay (RGB view)", use_container_width=True)
+        st.image(vis, caption="Detections overlay (RGB view)", use_container_width=True)
         st.write(f"Detected objects (visualized): **{len(normalized)}**")
 
+        # ------------------
         # Results table
+        # ------------------
         df = pd.DataFrame(normalized)
         df["area_px2"] = df["w"]*df["h"]
         df["center"] = df.apply(lambda r: f"({int(r['x']+r['w']/2)},{int(r['y']+r['h']/2)})", axis=1)
         st.dataframe(df[["detection_id","assigned_label","confidence","x","y","w","h","area_px2","center"]])
         st.download_button("Download results CSV", df.to_csv(index=False).encode("utf-8"), file_name="detections.csv", mime="text/csv")
 
-        # Morphology
+        # ------------------
+        # Morphology analysis
+        # ------------------
         st.subheader("Morphological Analysis")
         metrics = compute_morphology_metrics(normalized)
         st.markdown(
@@ -256,12 +256,16 @@ with col1:
         st.pyplot(plot_size_distribution(normalized))
         st.pyplot(plot_aspect_ratio(normalized))
 
+        # ------------------
         # Explainability
+        # ------------------
         st.subheader("Explainability")
         heat = simulated_heatmap(img, normalized)
-        st.image(heat[..., ::-1], caption="Activation heatmap", use_container_width=True)
+        st.image(heat, caption="Activation heatmap", use_container_width=True)
 
-        # Professional Summary
+        # ------------------
+        # Professional summary
+        # ------------------
         st.markdown("---")
         st.subheader("Professional Summary")
         brightness = round(float(np.mean(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY))), 2)
@@ -279,7 +283,7 @@ with col1:
         st.write(notes["control"])
 
 with col2:
-    # Export
+    # Export / Citizen upload
     st.subheader("Export / Citizen Upload")
     if st.button("Export PDF report"):
         html_report = f"""
@@ -301,8 +305,9 @@ with col2:
             if submit:
                 save_path = save_upload(img_bytes, filename, location, contributor, extra_notes, normalized)
                 st.success(f"Saved to uploads: {save_path}")
+
 # ---------------------------
-# Footer (Professional)
+# Footer
 # ---------------------------
 st.markdown("---")
 st.markdown(
