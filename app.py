@@ -128,11 +128,17 @@ with col1:
     else:
         filename = None
 
-    if img_bytes:
-        # Decode to numpy BGR
-        nparr = np.frombuffer(img_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        st.image(img[..., ::-1], caption="Input image (RGB view)", use_container_width=True)
+   if img_bytes:
+    # Open image via PIL
+    from PIL import Image
+    img_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    
+    # Convert to NumPy array for OpenCV / model processing
+    img = np.array(img_pil)
+    
+    # Display in Streamlit (RGB)
+    st.image(img, caption="Input image (RGB view)", use_container_width=True)
+
 
         # ------------------
         # Image QC as note
