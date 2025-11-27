@@ -128,16 +128,27 @@ with col1:
     else:
         filename = None
 
-   if img_bytes:
-    # Open image via PIL
-    from PIL import Image
-    img_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    
-    # Convert to NumPy array for OpenCV / model processing
-    img = np.array(img_pil)
-    
-    # Display in Streamlit (RGB)
-    st.image(img, caption="Input image (RGB view)", use_container_width=True)
+    if img_bytes:
+        # Open image via PIL
+        from PIL import Image
+        img_pil = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        
+        # Convert to NumPy array for OpenCV / model processing
+        img = np.array(img_pil)
+        
+        # Display in Streamlit (RGB)
+        st.image(img, caption="Input image (RGB view)", use_container_width=True)
+
+        # ------------------
+        # Image QC as note
+        # ------------------
+        st.subheader("Image Quality Control (QC)")
+        qc = analyze_quality(img)
+        st.markdown(f"**QC Metrics:**\n- Sharpness: {qc.get('sharpness', 'N/A')}\n- Brightness: {qc.get('brightness', 'N/A')}\n- Noise: {qc.get('noise', 'N/A')}\n- Passes QC: {qc.get('passes', False)}")
+        fig = brightness_histogram_plot(img)
+        st.pyplot(fig)
+        if not qc.get("passes", True):
+            st.warning("Image does not pass QC. Consider retaking or improving lighting/focus.")
 
 
         # ------------------
